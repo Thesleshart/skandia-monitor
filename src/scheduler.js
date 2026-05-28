@@ -14,6 +14,7 @@ const {
 const { syncToGoogleSheets }    = require('./googleSheets');
 const { getVariaciones }        = require('./utils/calculations');
 const { startServer }           = require('./api');
+const { sendDailySummary }      = require('./notifier');
 
 // 7:00 AM Colombia (America/Bogota = UTC-5, sin DST)
 // node-cron soporta timezone directamente
@@ -55,6 +56,10 @@ async function runDailyJob() {
     console.log('[JOB] Variaciones:', JSON.stringify(variaciones));
 
     await syncToGoogleSheets(data, variaciones);
+
+    // 4 ── Notificación por correo
+    console.log('[JOB] 4/4  Enviando resumen por email...');
+    await sendDailySummary(data, variaciones);
 
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     console.log(`\n[JOB] ✓ Completado en ${elapsed}s`);

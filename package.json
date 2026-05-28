@@ -10,13 +10,14 @@
     "test:db": "node -e \"require('./src/database').getAllRecords().then(r => console.log(JSON.stringify(r,null,2))).catch(console.error)\""
   },
   "dependencies": {
-    "puppeteer": "^22.8.2",
     "@libsql/client": "^0.14.0",
-    "googleapis": "^144.0.0",
-    "express": "^4.19.2",
-    "node-cron": "^3.0.3",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "cors": "^2.8.5"
+    "express": "^4.19.2",
+    "googleapis": "^144.0.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.10.1",
+    "puppeteer": "^22.8.2"
   },
   "engines": {
     "node": "20.x"
