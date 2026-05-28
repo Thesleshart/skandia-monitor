@@ -12,9 +12,9 @@ services:
 
     buildCommand: |
       npm ci
-      # Instalar Chrome para Puppeteer — forzamos la descarga
-      # aunque PUPPETEER_SKIP_DOWNLOAD esté en el entorno
-      PUPPETEER_SKIP_DOWNLOAD=false npx puppeteer browsers install chrome
+      # Instalar Chrome DENTRO del proyecto para que persista en el snapshot de Render
+      # PUPPETEER_CACHE_DIR debe apuntar a dentro de /opt/render/project/
+      PUPPETEER_CACHE_DIR=/opt/render/project/.cache/puppeteer PUPPETEER_SKIP_DOWNLOAD=false npx puppeteer browsers install chrome
 
     startCommand: node src/scheduler.js
 
@@ -25,7 +25,9 @@ services:
         value: 10000
       - key: CRON_SCHEDULE
         value: "0 7 * * 1-5"
-      # Chrome se auto-detecta en scraper.js con find — no se necesita path fijo
+      # Chrome instalado aquí durante el build — persiste en el snapshot del proyecto
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/project/.cache/puppeteer
       # ⚠️ Completar en el dashboard de Render (Settings > Environment):
       - key: SKANDIA_USER
         sync: false
