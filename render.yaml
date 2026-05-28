@@ -1,0 +1,45 @@
+# render.yaml — Infraestructura Skandia Monitor en Render
+# Doc: https://render.com/docs/infrastructure-as-code
+
+services:
+
+  # ── Web Service: Dashboard + API + Cron interno ──────────────
+  - type: web
+    name: skandia-monitor
+    runtime: node
+    plan: free             # plan gratuito — Turso maneja la DB en la nube
+    region: oregon
+
+    buildCommand: |
+      npm ci
+      # Instalar Chrome para Puppeteer en Linux
+      npx puppeteer browsers install chrome
+
+    startCommand: node src/scheduler.js
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CRON_SCHEDULE
+        value: "0 7 * * 1-5"
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /opt/render/project/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome
+      # ⚠️ Completar en el dashboard de Render (Settings > Environment):
+      - key: SKANDIA_USER
+        sync: false
+      - key: SKANDIA_PASSWORD
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: GOOGLE_SHEETS_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_KEY
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false          # libsql://tu-db.turso.io
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+
+    healthCheckPath: /api/stats

@@ -1,0 +1,24 @@
+{
+  "name": "skandia-monitor",
+  "version": "1.0.0",
+  "description": "Monitor automatizado de pensiones voluntarias Skandia",
+  "main": "src/scheduler.js",
+  "scripts": {
+    "start": "node src/scheduler.js",
+    "api": "node src/api.js",
+    "scrape": "node src/scraper.js",
+    "test:db": "node -e \"require('./src/database').getAllRecords().then(r => console.log(JSON.stringify(r,null,2))).catch(console.error)\""
+  },
+  "dependencies": {
+    "puppeteer": "^22.8.2",
+    "@libsql/client": "^0.14.0",
+    "googleapis": "^144.0.0",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

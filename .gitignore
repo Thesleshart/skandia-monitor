@@ -1,0 +1,19 @@
+# ── Credenciales — NUNCA subir ───────────────────────────────
+.env
+
+# ── Dependencias ─────────────────────────────────────────────
+node_modules/
+
+# ── Base de datos local y archivos de debug ───────────────────
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── Sistema operativo ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
