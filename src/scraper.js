@@ -164,9 +164,48 @@ async function launchBrowser() {
     defaultViewport: { width: 1366, height: 900 },
     timeout: 60_000,
   };
-  if (isProd && process.env.PUPPETEER_EXECUTABLE_PATH) {
-    opts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+
+  if (isProd) {
+    // Auto-detectar Chrome instalado por Puppeteer en Render
+    // La ruta exacta varía por versión: /opt/render/.cache/puppeteer/chrome/linux-XXXX/chrome-linux64/chrome
+    const { execSync } = require('child_process');
+    const searchPaths = [
+      '/opt/render/.cache/puppeteer',
+      '/opt/render/project/.cache/puppeteer',
+      process.env.PUPPETEER_CACHE_DIR,
+    ].filter(Boolean);
+
+    let chromePath = null;
+
+    // 1. Intentar con PUPPETEER_EXECUTABLE_PATH si no tiene glob
+    const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    if (envPath && !envPath.includes('*') && fs.existsSync(envPath)) {
+      chromePath = envPath;
+    }
+
+    // 2. Auto-detectar con find en las rutas conocidas
+    if (!chromePath) {
+      for (const base of searchPaths) {
+        try {
+          const found = execSync(
+            `find "${base}" -name "chrome" -type f 2>/dev/null | head -1`
+          ).toString().trim();
+          if (found && fs.existsSync(found)) {
+            chromePath = found;
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (chromePath) {
+      console.log(`[SCR] Chrome detectado: ${chromePath}`);
+      opts.executablePath = chromePath;
+    } else {
+      console.warn('[SCR] ⚠️  No se encontró Chrome manualmente — dejando que Puppeteer lo resuelva');
+    }
   }
+
   return puppeteer.launch(opts);
 }
 
