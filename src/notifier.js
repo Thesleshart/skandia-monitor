@@ -1,14 +1,12 @@
 /**
  * notifier.js — Envía el resumen diario por correo después de cada scrape.
  *
- * Usa Gmail SMTP con App Password (no requiere OAuth).
- * Configurar en .env:
- *   GMAIL_USER=sebastiancanoarias@gmail.com
- *   GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx   ← 16 caracteres de Google
- *   NOTIFY_EMAIL=sebastiancanoarias@gmail.com ← destinatario (puede ser el mismo)
+ * Usa Resend HTTP API (funciona en Render — no usa puertos SMTP bloqueados).
+ * Configurar en Render Environment:
+ *   RESEND_API_KEY=re_xxxxxxxxxxxxxxxx  ← desde resend.com/api-keys
+ *   NOTIFY_EMAIL=sebastiancanoarias@gmail.com ← destinatario
  */
 
-const nodemailer = require('nodemailer');
 const { formatCOP, formatPct } = require('./utils/calculations');
 
 const DASHBOARD_URL = 'https://skandia-monitor.onrender.com';
@@ -248,37 +246,45 @@ Skandia Monitor • Automático 7:00 AM
 }
 
 /**
- * Envía el correo de resumen diario.
- * Si las variables de entorno no están configuradas, omite silenciosamente.
+ * Envía el correo de resumen diario via Resend HTTP API.
+ * Render free tier bloquea SMTP (puertos 25/465/587) — Resend usa HTTPS (443).
+ * Si RESEND_API_KEY no está configurado, omite silenciosamente.
  */
 async function sendDailySummary(data, variaciones) {
-  const user     = process.env.GMAIL_USER;
-  const pass     = process.env.GMAIL_APP_PASSWORD;
-  const to       = process.env.NOTIFY_EMAIL || user;
+  const apiKey = process.env.RESEND_API_KEY;
+  const to     = process.env.NOTIFY_EMAIL || 'sebastiancanoarias@gmail.com';
 
-  if (!user || !pass) {
-    console.log('[MAIL] ⚠️  GMAIL_USER / GMAIL_APP_PASSWORD no configurados — omitiendo email');
+  if (!apiKey) {
+    console.log('[MAIL] ⚠️  RESEND_API_KEY no configurado — omitiendo email');
     return { ok: false, reason: 'not_configured' };
   }
 
   const fecha = data.fecha || new Date().toISOString().split('T')[0];
 
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass },
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from:    'Skandia Monitor <onboarding@resend.dev>',
+        to:      [to],
+        subject: `📊 Skandia — ${fecha} · ${formatCOP(data.total)}`,
+        text:    buildEmailText(data, variaciones, fecha),
+        html:    buildEmailHtml(data, variaciones, fecha),
+      }),
     });
 
-    const info = await transporter.sendMail({
-      from:    `"Skandia Monitor" <${user}>`,
-      to,
-      subject: `📊 Skandia — ${fecha} · ${formatCOP(data.total)}`,
-      text:    buildEmailText(data, variaciones, fecha),
-      html:    buildEmailHtml(data, variaciones, fecha),
-    });
+    const result = await response.json();
 
-    console.log(`[MAIL] ✅ Correo enviado a ${to} (${info.messageId})`);
-    return { ok: true, messageId: info.messageId };
+    if (!response.ok) {
+      throw new Error(result.message || `HTTP ${response.status}`);
+    }
+
+    console.log(`[MAIL] ✅ Correo enviado a ${to} (id: ${result.id})`);
+    return { ok: true, id: result.id };
 
   } catch (err) {
     console.error('[MAIL] ❌ Error enviando correo:', err.message);
