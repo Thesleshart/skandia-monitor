@@ -87,14 +87,19 @@ async function runDailyJob() {
   // Servidor Express (pasamos runDailyJob para el endpoint POST /api/trigger)
   await startServer(runDailyJob);
 
-  // Cron
-  if (!cron.validate(SCHEDULE)) {
-    console.error(`[CRON] Expresión inválida: "${SCHEDULE}"`);
-    process.exit(1);
+  // Cron interno — desactivado cuando GitHub Actions maneja el schedule
+  // Activar con DISABLE_CRON=false si se quiere volver al modo autónomo
+  if (process.env.DISABLE_CRON === 'true') {
+    console.log('[CRON] Desactivado (DISABLE_CRON=true) — GitHub Actions maneja el schedule\n');
+  } else {
+    if (!cron.validate(SCHEDULE)) {
+      console.error(`[CRON] Expresión inválida: "${SCHEDULE}"`);
+      process.exit(1);
+    }
+    cron.schedule(SCHEDULE, runDailyJob, { timezone: TZ });
+    console.log(`[CRON] Programado: "${SCHEDULE}" (${TZ})`);
+    console.log('[CRON] Próxima ejecución: 7:00 AM siguiente día hábil\n');
   }
-  cron.schedule(SCHEDULE, runDailyJob, { timezone: TZ });
-  console.log(`[CRON] Programado: "${SCHEDULE}" (${TZ})`);
-  console.log('[CRON] Próxima ejecución: 7:00 AM siguiente día hábil\n');
 
   // Ejecutar inmediatamente si se pasa --now
   if (process.argv.includes('--now')) {
