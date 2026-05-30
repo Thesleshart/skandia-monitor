@@ -3,7 +3,7 @@ name: Daily Skandia Scrape
 on:
   schedule:
     # 7:00 AM Bogotá = 12:00 UTC (Colombia es UTC-5 sin DST)
-    - cron: '0 12 * * 1-5'
+    - cron: '0 12 * * *'
   workflow_dispatch:
     # Permite disparar manualmente desde GitHub → Actions → Run workflow
 
