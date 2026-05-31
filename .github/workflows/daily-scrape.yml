@@ -60,6 +60,7 @@ jobs:
     name: Scrape — Cliente
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: scrape-sebastian  # Espera a Sebastian para evitar conflictos de migración DB
 
     steps:
       - name: Checkout código
