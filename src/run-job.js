@@ -16,10 +16,11 @@ const { getVariaciones }     = require('./utils/calculations');
 const { sendDailySummary }   = require('./notifier');
 
 async function main() {
-  const t0  = Date.now();
-  const sep = '─'.repeat(52);
+  const t0     = Date.now();
+  const userId = process.env.USER_ID || 'sebastian';
+  const sep    = '─'.repeat(52);
   console.log(`\n${sep}`);
-  console.log(`[JOB] INICIO  ${new Date().toISOString()}`);
+  console.log(`[JOB] INICIO  ${new Date().toISOString()} (usuario: ${userId})`);
   console.log(sep);
 
   try {
@@ -35,15 +36,15 @@ async function main() {
 
     // 2 ── Persistencia
     console.log('[JOB] 2/4  Guardando en Turso...');
-    await saveRecord(data);
+    await saveRecord(data, userId);
 
     // 3 ── Variaciones + Google Sheets
     console.log('[JOB] 3/4  Variaciones + Google Sheets...');
     const [year, month] = data.fecha.split('-').map(Number);
     const [yesterday, firstOfMonth, firstOfYear] = await Promise.all([
-      getPreviousRecord(data.fecha),
-      getFirstRecordOfMonth(year, month),
-      getFirstRecordOfYear(year),
+      getPreviousRecord(data.fecha, userId),
+      getFirstRecordOfMonth(year, month, userId),
+      getFirstRecordOfYear(year, userId),
     ]);
     const variaciones = getVariaciones(data, { yesterday, firstOfMonth, firstOfYear });
     console.log('[JOB] Variaciones:', JSON.stringify(variaciones));

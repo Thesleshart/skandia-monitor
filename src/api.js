@@ -16,58 +16,58 @@ app.use(express.json());
 
 // ── Helpers ──────────────────────────────────────────────────
 
-async function buildVariaciones(record) {
+async function buildVariaciones(record, userId) {
   if (!record) return null;
   const [year, month] = record.fecha.split('-').map(Number);
   const [yesterday, firstOfMonth, firstOfYear] = await Promise.all([
-    getPreviousRecord(record.fecha),
-    getFirstRecordOfMonth(year, month),
-    getFirstRecordOfYear(year),
+    getPreviousRecord(record.fecha, userId),
+    getFirstRecordOfMonth(year, month, userId),
+    getFirstRecordOfYear(year, userId),
   ]);
   return getVariaciones(record, { yesterday, firstOfMonth, firstOfYear });
 }
 
-async function withVars(record) {
-  return { ...record, variaciones: await buildVariaciones(record) };
+async function withVars(record, userId) {
+  return { ...record, variaciones: await buildVariaciones(record, userId) };
 }
 
-// ── Endpoints ────────────────────────────────────────────────
+// ── Endpoints (soportan ?user=sebastian o ?user=cliente) ─────
 
-// Último registro con variaciones
 app.get('/api/latest', async (req, res) => {
   try {
-    const r = await getLatestRecord();
+    const userId = req.query.user || 'sebastian';
+    const r = await getLatestRecord(userId);
     if (!r) return res.status(404).json({ error: 'Sin registros todavía' });
-    res.json(await withVars(r));
+    res.json(await withVars(r, userId));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Histórico — acepta ?start=YYYY-MM-DD&end=YYYY-MM-DD&limit=N
 app.get('/api/history', async (req, res) => {
   try {
+    const userId = req.query.user || 'sebastian';
     const { start, end, limit } = req.query;
     let records = await ((start && end)
-      ? getRecordsByDateRange(start, end)
-      : getAllRecords());
+      ? getRecordsByDateRange(start, end, userId)
+      : getAllRecords(userId));
     if (limit) records = records.slice(0, parseInt(limit, 10));
-    const withVariaciones = await Promise.all(records.map(withVars));
+    const withVariaciones = await Promise.all(records.map(r => withVars(r, userId)));
     res.json({ total: withVariaciones.length, records: withVariaciones });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Registro por fecha exacta
 app.get('/api/record/:fecha', async (req, res) => {
   try {
-    const r = await getRecordByDate(req.params.fecha);
+    const userId = req.query.user || 'sebastian';
+    const r = await getRecordByDate(req.params.fecha, userId);
     if (!r) return res.status(404).json({ error: 'Fecha no encontrada' });
-    res.json(await withVars(r));
+    res.json(await withVars(r, userId));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Estadísticas globales
 app.get('/api/stats', async (req, res) => {
   try {
-    const all = await getAllRecords();
+    const userId = req.query.user || 'sebastian';
+    const all = await getAllRecords(userId);
     if (!all.length) return res.json({ registros: 0 });
     const totales = all.map(r => r.total).filter(Boolean);
     const latest  = all[0];
@@ -82,28 +82,28 @@ app.get('/api/stats', async (req, res) => {
       variacion_total_pct: oldest.total
         ? +((latest.total - oldest.total) / Math.abs(oldest.total) * 100).toFixed(2)
         : null,
-      variaciones_hoy: await buildVariaciones(latest),
+      variaciones_hoy: await buildVariaciones(latest, userId),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Exportar todo como JSON descargable
 app.get('/api/export', async (req, res) => {
   try {
-    const records = await getAllRecords();
-    const datos   = await Promise.all(records.map(withVars));
+    const userId  = req.query.user || 'sebastian';
+    const records = await getAllRecords(userId);
+    const datos   = await Promise.all(records.map(r => withVars(r, userId)));
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition',
-      `attachment; filename="skandia-${new Date().toISOString().split('T')[0]}.json"`);
+      `attachment; filename="skandia-${userId}-${new Date().toISOString().split('T')[0]}.json"`);
     res.json({ exportado_en: new Date().toISOString(), total: datos.length, datos });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Trigger manual del job (se registra desde scheduler.js)
-// POST /api/trigger — inyectado después de arrancar el scheduler
-
 // ── Dashboard HTML ───────────────────────────────────────────
-app.get('/', (_req, res) => res.send(DASHBOARD_HTML));
+// Tu dashboard:      skandia-monitor.onrender.com/
+// Dashboard cliente: skandia-monitor.onrender.com/cliente
+app.get('/',         (_req, res) => res.send(buildDashboard('sebastian')));
+app.get('/cliente',  (_req, res) => res.send(buildDashboard('cliente')));
 
 function startServer(triggerHandler) {
   if (triggerHandler) {
@@ -124,12 +124,16 @@ module.exports = { app, startServer };
 if (require.main === module) startServer().catch(console.error);
 
 // ── Dashboard HTML inline ─────────────────────────────────────
-const DASHBOARD_HTML = `<!DOCTYPE html>
+function buildDashboard(userId) {
+  const apiBase = userId === 'sebastian' ? '' : '';
+  const userParam = `?user=${userId}`;
+  const title = userId === 'sebastian' ? '📈 Skandia Monitor' : '📈 Skandia Monitor — Cliente';
+  return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Skandia Monitor</title>
+<title>${title}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
@@ -153,15 +157,11 @@ tr:hover td{background:#263248}
 .links{display:flex;gap:8px;flex-wrap:wrap;margin-top:1.8rem}
 .link{background:#1e293b;color:#94a3b8;padding:5px 10px;border-radius:6px;font-size:.75rem;font-family:monospace;text-decoration:none}
 .link:hover{background:#334155;color:#f1f5f9}
-#trigger{background:#1d4ed8;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem;margin-top:1.5rem}
-#trigger:hover{background:#2563eb}
-#trigger:disabled{opacity:.5;cursor:not-allowed}
-#status{margin-top:.6rem;font-size:.8rem;color:#64748b;min-height:1.2rem}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>📈 Skandia Monitor</h1>
+  <h1>${title}</h1>
   <p class="sub" id="last-update">Cargando...</p>
 
   <div class="grid" id="cards"><div style="color:#64748b">Cargando...</div></div>
@@ -174,19 +174,17 @@ tr:hover td{background:#263248}
   <table><thead><tr><th>Fecha</th><th>Capital</th><th>Rendimientos</th><th>Total</th><th>Var. Diaria</th><th>Var. Mensual</th></tr></thead>
   <tbody id="histbody"><tr><td colspan="6" style="color:#64748b;text-align:center">—</td></tr></tbody></table>
 
-  <button id="trigger" onclick="triggerJob()">▶ Ejecutar ahora</button>
-  <p id="status"></p>
-
   <div class="links">
     <span style="color:#64748b;font-size:.8rem;align-self:center">API:</span>
-    <a class="link" href="/api/latest">/api/latest</a>
-    <a class="link" href="/api/history">/api/history</a>
-    <a class="link" href="/api/stats">/api/stats</a>
-    <a class="link" href="/api/export">/api/export</a>
+    <a class="link" href="/api/latest${userParam}">/api/latest</a>
+    <a class="link" href="/api/history${userParam}">/api/history</a>
+    <a class="link" href="/api/stats${userParam}">/api/stats</a>
+    <a class="link" href="/api/export${userParam}">/api/export</a>
   </div>
 </div>
 
 <script>
+const USER='${userId}';
 const fmt = n => n!=null ? new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0}).format(n) : 'N/A';
 const pct = v => v!=null ? (v>0?'+':'')+v.toFixed(2)+'%' : 'N/A';
 const cls = v => v==null?'neu':v>0?'pos':v<0?'neg':'neu';
@@ -195,8 +193,8 @@ const badge = v => v==null?'':v>0?'<span class="badge bp">'+pct(v)+'</span>':'<s
 async function load(){
   try{
     const [lat,hist]=await Promise.all([
-      fetch('/api/latest').then(r=>r.json()),
-      fetch('/api/history?limit=30').then(r=>r.json()),
+      fetch('/api/latest?user='+USER).then(r=>r.json()),
+      fetch('/api/history?user='+USER+'&limit=30').then(r=>r.json()),
     ]);
     document.getElementById('last-update').textContent='Última actualización: '+(lat.fecha||'Sin datos');
     const v=lat.variaciones||{};
@@ -219,19 +217,9 @@ async function load(){
   }catch(e){console.error(e);}
 }
 
-async function triggerJob(){
-  const btn=document.getElementById('trigger');
-  const st=document.getElementById('status');
-  btn.disabled=true; st.textContent='Iniciando...';
-  try{
-    const r=await fetch('/api/trigger',{method:'POST'}).then(r=>r.json());
-    st.textContent='Job iniciado: '+r.ts+' — revisa la consola del servidor';
-    setTimeout(()=>{load();btn.disabled=false;},15000);
-  }catch(e){st.textContent='Error: '+e.message;btn.disabled=false;}
-}
-
 load();
 setInterval(load,60_000);
 </script>
 </body>
 </html>`;
+}

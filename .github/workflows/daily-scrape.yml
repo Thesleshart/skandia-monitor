@@ -2,14 +2,16 @@ name: Daily Skandia Scrape
 
 on:
   schedule:
-    # 7:00 AM Bogotá = 12:00 UTC (Colombia es UTC-5 sin DST)
-    - cron: '0 12 * * *'
+    - cron: '0 12 * * *'   # Sebastian  → 7:00 AM Bogotá (UTC-5)
+    - cron: '0 13 * * *'   # Cliente    → 8:00 AM Bogotá (UTC-5)
   workflow_dispatch:
     # Permite disparar manualmente desde GitHub → Actions → Run workflow
 
 jobs:
-  scrape:
-    name: Scrape Skandia
+
+  # ── JOB 1: Sebastian ──────────────────────────────────────────
+  scrape-sebastian:
+    name: Scrape — Sebastian
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -35,6 +37,7 @@ jobs:
         run: node src/run-job.js
         env:
           NODE_ENV: production
+          USER_ID: sebastian
           SKANDIA_USER: ${{ secrets.SKANDIA_USER }}
           SKANDIA_PASSWORD: ${{ secrets.SKANDIA_PASSWORD }}
           SKANDIA_URL: https://cliente.skandia.com.co/wps/portal/clientes/LoginOM/
@@ -50,9 +53,50 @@ jobs:
           curl -s -X POST https://api.resend.com/emails \
             -H "Authorization: Bearer ${{ secrets.RESEND_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "from": "Skandia Monitor <onboarding@resend.dev>",
-              "to": ["sebastiancanoarias@gmail.com"],
-              "subject": "ALERTA: Skandia Monitor falló hoy",
-              "html": "<h2>El scrape diario falló</h2><p>Revisa los logs en <a href=\"https://github.com/Thesleshart/skandia-monitor/actions\">GitHub Actions</a></p>"
-            }'
+            -d '{"from":"Skandia Monitor <onboarding@resend.dev>","to":["sebastiancanoarias@gmail.com"],"subject":"ALERTA: Tu scrape falló hoy","html":"<h2>El scrape diario falló</h2><p>Revisa los logs en <a href=\"https://github.com/Thesleshart/skandia-monitor/actions\">GitHub Actions</a></p>"}'
+
+  # ── JOB 2: Cliente ────────────────────────────────────────────
+  scrape-cliente:
+    name: Scrape — Cliente
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias (sin Chrome)
+        run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+      - name: Instalar Chrome para Puppeteer
+        run: npx puppeteer browsers install chrome
+
+      - name: Ejecutar scrape diario
+        run: node src/run-job.js
+        env:
+          NODE_ENV: production
+          USER_ID: cliente
+          SKANDIA_USER: ${{ secrets.CLIENTE_SKANDIA_USER }}
+          SKANDIA_PASSWORD: ${{ secrets.CLIENTE_SKANDIA_PASSWORD }}
+          SKANDIA_URL: https://cliente.skandia.com.co/wps/portal/clientes/LoginOM/
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFY_EMAIL: ${{ secrets.CLIENTE_NOTIFY_EMAIL }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+
+      - name: Notificar fallo por email
+        if: failure()
+        run: |
+          curl -s -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer ${{ secrets.RESEND_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"from":"Skandia Monitor <onboarding@resend.dev>","to":["sebastiancanoarias@gmail.com"],"subject":"ALERTA: Scrape del cliente falló hoy","html":"<h2>El scrape del cliente falló</h2><p>Revisa los logs en <a href=\"https://github.com/Thesleshart/skandia-monitor/actions\">GitHub Actions</a></p>"}'
