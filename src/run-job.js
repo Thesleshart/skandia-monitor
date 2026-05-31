@@ -52,7 +52,7 @@ async function main() {
 
     // 4 ── Email
     console.log('[JOB] 4/4  Enviando resumen por email...');
-    await sendDailySummary(data, variaciones);
+    await sendDailySummary(data, variaciones, userId);
 
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     console.log(`\n[JOB] COMPLETADO en ${elapsed}s`);

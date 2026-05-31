@@ -9,7 +9,11 @@
 
 const { formatCOP, formatPct } = require('./utils/calculations');
 
-const DASHBOARD_URL = 'https://skandia-monitor.onrender.com';
+const BASE_URL = 'https://skandia-monitor.onrender.com';
+
+function getDashboardUrl(userId) {
+  return userId === 'cliente' ? `${BASE_URL}/cliente` : BASE_URL;
+}
 
 /**
  * Devuelve emoji y color según el valor de una variación.
@@ -24,7 +28,8 @@ function varStyle(pct) {
 /**
  * Construye el HTML del correo.
  */
-function buildEmailHtml(data, variaciones, fecha) {
+function buildEmailHtml(data, variaciones, fecha, dashboardUrl) {
+  const DASHBOARD_URL = dashboardUrl;
   const dv = varStyle(variaciones?.diaria);
   const mv = varStyle(variaciones?.mensual);
   const av = varStyle(variaciones?.anual);
@@ -217,7 +222,7 @@ function buildEmailHtml(data, variaciones, fecha) {
 /**
  * Construye el texto plano como fallback.
  */
-function buildEmailText(data, variaciones, fecha) {
+function buildEmailText(data, variaciones, fecha, dashboardUrl) {
   const dv = varStyle(variaciones?.diaria);
   const mv = varStyle(variaciones?.mensual);
   const av = varStyle(variaciones?.anual);
@@ -238,7 +243,7 @@ VARIACIONES:
   Mensual:  ${mv.emoji} ${mv.text}
   Anual:    ${av.emoji} ${av.text}
 
-🔗 Dashboard: ${DASHBOARD_URL}
+🔗 Dashboard: ${dashboardUrl}
 
 ──────────────────────────────────────────
 Skandia Monitor • Automático 7:00 AM
@@ -250,9 +255,10 @@ Skandia Monitor • Automático 7:00 AM
  * Render free tier bloquea SMTP (puertos 25/465/587) — Resend usa HTTPS (443).
  * Si RESEND_API_KEY no está configurado, omite silenciosamente.
  */
-async function sendDailySummary(data, variaciones) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to     = process.env.NOTIFY_EMAIL || 'sebastiancanoarias@gmail.com';
+async function sendDailySummary(data, variaciones, userId = 'sebastian') {
+  const apiKey      = process.env.RESEND_API_KEY;
+  const to          = process.env.NOTIFY_EMAIL || 'sebastiancanoarias@gmail.com';
+  const dashboardUrl = getDashboardUrl(userId);
 
   if (!apiKey) {
     console.log('[MAIL] ⚠️  RESEND_API_KEY no configurado — omitiendo email');
@@ -272,8 +278,8 @@ async function sendDailySummary(data, variaciones) {
         from:    'Skandia Monitor <onboarding@resend.dev>',
         to:      [to],
         subject: `📊 Skandia — ${fecha} · ${formatCOP(data.total)}`,
-        text:    buildEmailText(data, variaciones, fecha),
-        html:    buildEmailHtml(data, variaciones, fecha),
+        text:    buildEmailText(data, variaciones, fecha, dashboardUrl),
+        html:    buildEmailHtml(data, variaciones, fecha, dashboardUrl),
       }),
     });
 
