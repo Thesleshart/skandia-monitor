@@ -37,6 +37,42 @@ const client = createClient({
 // ──────────────────────────────────────────────
 
 async function initSchema() {
+  // ── Migración: agregar user_id si la tabla existe sin esa columna ──
+  try {
+    const { rows: cols } = await client.execute('PRAGMA table_info(daily_records)');
+    if (cols.length > 0) {
+      const hasUserId = cols.some(r => r.name === 'user_id');
+      if (!hasUserId) {
+        console.log('[DB] Migrando schema: agregando user_id...');
+        // Recrear tabla con el nuevo schema preservando datos
+        await client.execute(`
+          CREATE TABLE daily_records_v2 (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id            TEXT    NOT NULL DEFAULT 'sebastian',
+            fecha              TEXT    NOT NULL,
+            capital            REAL,
+            rendimientos       REAL,
+            total              REAL,
+            cuenta_contingente REAL,
+            created_at         TEXT DEFAULT (datetime('now')),
+            UNIQUE(user_id, fecha)
+          )
+        `);
+        await client.execute(`
+          INSERT INTO daily_records_v2 (id, user_id, fecha, capital, rendimientos, total, cuenta_contingente, created_at)
+          SELECT id, 'sebastian', fecha, capital, rendimientos, total, cuenta_contingente, created_at
+          FROM daily_records
+        `);
+        await client.execute('DROP TABLE daily_records');
+        await client.execute('ALTER TABLE daily_records_v2 RENAME TO daily_records');
+        console.log('[DB] Migración completada: user_id agregado, datos preservados');
+      }
+    }
+  } catch (e) {
+    // Tabla no existe aún — se crea abajo
+  }
+
+  // ── Crear tablas (fresh install o post-migración) ──────────────────
   await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS daily_records (
       id                 INTEGER PRIMARY KEY AUTOINCREMENT,
