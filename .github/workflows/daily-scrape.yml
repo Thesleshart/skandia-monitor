@@ -2,8 +2,7 @@ name: Daily Skandia Scrape
 
 on:
   schedule:
-    - cron: '0 12 * * *'   # Sebastian  → 7:00 AM Bogotá (UTC-5)
-    - cron: '0 13 * * *'   # Cliente    → 8:00 AM Bogotá (UTC-5)
+    - cron: '0 12 * * *'   # 7:00 AM Bogotá (UTC-5) — cron-job.org es el disparador principal
   workflow_dispatch:
     # Permite disparar manualmente desde GitHub → Actions → Run workflow
 

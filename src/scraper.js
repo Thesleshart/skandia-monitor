@@ -570,16 +570,45 @@ async function scrapeSkandiaData() {
         });
       }
 
+      // ── FECHA OFICIAL DE SKANDIA ─────────────────────────────────
+      // Skandia muestra: "Saldos actualizados al 31 de mayo de 2026"
+      // Usamos esa fecha en vez de la fecha de ejecución para evitar
+      // guardar el balance del día anterior con la fecha de hoy.
+      const bodyText = document.body.textContent || '';
+      const dateMatch = bodyText.match(
+        /Saldos actualizados al\s+(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/i
+      );
+      const skandiaDateRaw = dateMatch ? dateMatch[0] : null;
+
       return {
         capital, rendimientos, saldoTotal, cuentaContingente, portafolio,
+        skandiaDateRaw,
         _debug: { url: location.href, bodySnippet: document.body.innerText.slice(0, 500) },
       };
     });
 
     await shot(page, '07-extraccion-hecha');
 
+    // ── Parsear fecha oficial de Skandia ("31 de mayo de 2026" → "2026-05-31") ──
+    function parseSkandiaDate(raw) {
+      if (!raw) return null;
+      const MESES = {
+        enero: '01', febrero: '02', marzo: '03', abril: '04',
+        mayo: '05', junio: '06', julio: '07', agosto: '08',
+        septiembre: '09', octubre: '10', noviembre: '11', diciembre: '12',
+      };
+      const m = raw.match(/(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/i);
+      if (!m) return null;
+      const month = MESES[m[2].toLowerCase()];
+      if (!month) return null;
+      return `${m[3]}-${month}-${m[1].padStart(2, '0')}`;
+    }
+
+    const skandiaFecha = parseSkandiaDate(rawData.skandiaDateRaw);
+    const fechaFallback = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+
     const result = {
-      fecha:              new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }),
+      fecha: skandiaFecha || fechaFallback,
       capital:            rawData.capital,
       rendimientos:       rawData.rendimientos,
       total:              rawData.saldoTotal,
@@ -589,6 +618,7 @@ async function scrapeSkandiaData() {
     };
 
     console.log('[SCR] ✅ Datos extraídos:');
+    console.log(`       Fecha Skandia: ${skandiaFecha ? skandiaFecha + ' (oficial Skandia)' : 'no encontrada → usando ' + fechaFallback}`);
     console.log(`       Capital:      ${result.capital      != null ? '$'+result.capital.toLocaleString('es-CO')      : 'NO ENCONTRADO'}`);
     console.log(`       Rendimientos: ${result.rendimientos != null ? '$'+result.rendimientos.toLocaleString('es-CO') : 'NO ENCONTRADO'}`);
     console.log(`       Saldo Total:  ${result.total        != null ? '$'+result.total.toLocaleString('es-CO')        : 'NO ENCONTRADO'}`);
