@@ -579,7 +579,7 @@ async function scrapeSkandiaData() {
     await shot(page, '07-extraccion-hecha');
 
     const result = {
-      fecha:              new Date().toISOString().split('T')[0],
+      fecha:              new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }),
       capital:            rawData.capital,
       rendimientos:       rawData.rendimientos,
       total:              rawData.saldoTotal,
