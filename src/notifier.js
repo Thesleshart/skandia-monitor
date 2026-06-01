@@ -251,21 +251,53 @@ Skandia Monitor • Automático 7:00 AM
 }
 
 /**
- * Envía el correo de resumen diario via Resend HTTP API.
- * Render free tier bloquea SMTP (puertos 25/465/587) — Resend usa HTTPS (443).
- * Si RESEND_API_KEY no está configurado, omite silenciosamente.
+ * Envía el correo de resumen diario.
+ *
+ * Estrategia de envío (en orden de prioridad):
+ * 1. Gmail SMTP — usa GMAIL_USER + GMAIL_APP_PASSWORD
+ *    → Funciona en GitHub Actions (sin restricción de puertos)
+ *    → Puede enviar a CUALQUIER destinatario
+ * 2. Resend HTTP API — usa RESEND_API_KEY (fallback)
+ *    → Solo funciona para el propio email sin dominio verificado
  */
 async function sendDailySummary(data, variaciones, userId = 'sebastian') {
-  const apiKey      = process.env.RESEND_API_KEY;
-  const to          = process.env.NOTIFY_EMAIL || 'sebastiancanoarias@gmail.com';
+  const to           = process.env.NOTIFY_EMAIL || 'sebastiancanoarias@gmail.com';
   const dashboardUrl = getDashboardUrl(userId);
+  const fecha        = data.fecha || new Date().toISOString().split('T')[0];
+  const subject      = `📊 Skandia — ${fecha} · ${formatCOP(data.total)}`;
 
-  if (!apiKey) {
-    console.log('[MAIL] ⚠️  RESEND_API_KEY no configurado — omitiendo email');
-    return { ok: false, reason: 'not_configured' };
+  // ── Opción 1: Gmail SMTP (preferido — funciona con cualquier destinatario) ──
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+
+  if (gmailUser && gmailPass) {
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: gmailUser, pass: gmailPass },
+      });
+      const info = await transporter.sendMail({
+        from:    `"Skandia Monitor" <${gmailUser}>`,
+        to,
+        subject,
+        text:    buildEmailText(data, variaciones, fecha, dashboardUrl),
+        html:    buildEmailHtml(data, variaciones, fecha, dashboardUrl),
+      });
+      console.log(`[MAIL] ✅ Correo enviado a ${to} vía Gmail (${info.messageId})`);
+      return { ok: true, method: 'gmail', messageId: info.messageId };
+    } catch (err) {
+      console.error('[MAIL] ⚠️  Gmail SMTP falló, intentando Resend...', err.message);
+    }
   }
 
-  const fecha = data.fecha || new Date().toISOString().split('T')[0];
+  // ── Opción 2: Resend HTTP API (fallback) ──────────────────────────────────
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    console.log('[MAIL] ⚠️  Sin método de envío configurado — omitiendo email');
+    return { ok: false, reason: 'not_configured' };
+  }
 
   try {
     const response = await fetch('https://api.resend.com/emails', {
@@ -277,20 +309,17 @@ async function sendDailySummary(data, variaciones, userId = 'sebastian') {
       body: JSON.stringify({
         from:    'Skandia Monitor <onboarding@resend.dev>',
         to:      [to],
-        subject: `📊 Skandia — ${fecha} · ${formatCOP(data.total)}`,
+        subject,
         text:    buildEmailText(data, variaciones, fecha, dashboardUrl),
         html:    buildEmailHtml(data, variaciones, fecha, dashboardUrl),
       }),
     });
 
     const result = await response.json();
+    if (!response.ok) throw new Error(result.message || `HTTP ${response.status}`);
 
-    if (!response.ok) {
-      throw new Error(result.message || `HTTP ${response.status}`);
-    }
-
-    console.log(`[MAIL] ✅ Correo enviado a ${to} (id: ${result.id})`);
-    return { ok: true, id: result.id };
+    console.log(`[MAIL] ✅ Correo enviado a ${to} vía Resend (id: ${result.id})`);
+    return { ok: true, method: 'resend', id: result.id };
 
   } catch (err) {
     console.error('[MAIL] ❌ Error enviando correo:', err.message);
