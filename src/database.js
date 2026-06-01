@@ -126,8 +126,8 @@ async function saveRecord(data, userId = 'sebastian') {
   });
 
   const { rows } = await client.execute({
-    sql:  'SELECT id FROM daily_records WHERE fecha = ?',
-    args: [data.fecha],
+    sql:  'SELECT id FROM daily_records WHERE user_id = ? AND fecha = ?',
+    args: [userId, data.fecha],
   });
   const recordId = rows[0].id;
 
