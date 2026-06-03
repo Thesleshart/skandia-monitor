@@ -14,11 +14,11 @@ function calcVariacion(actual, anterior) {
  */
 function getVariaciones(hoy, { yesterday, firstOfMonth, firstOfYear } = {}) {
   if (!hoy) return null;
-  const t = hoy.total;
+  const r = hoy.rendimientos;
   return {
-    diaria:  yesterday    ? calcVariacion(t, yesterday.total)    : null,
-    mensual: firstOfMonth ? calcVariacion(t, firstOfMonth.total) : null,
-    anual:   firstOfYear  ? calcVariacion(t, firstOfYear.total)  : null,
+    diaria:  yesterday    ? calcVariacion(r, yesterday.rendimientos)    : null,
+    mensual: firstOfMonth ? calcVariacion(r, firstOfMonth.rendimientos) : null,
+    anual:   firstOfYear  ? calcVariacion(r, firstOfYear.rendimientos)  : null,
   };
 }
 
