@@ -4,7 +4,9 @@
  */
 function calcVariacion(actual, anterior) {
   if (anterior == null || anterior === 0 || actual == null) return null;
-  return ((actual - anterior) / Math.abs(anterior)) * 100;
+  // ((actual / anterior) - 1) × 100
+  // Muestra cómo se comportan los rendimientos respecto al período anterior
+  return ((actual / anterior) - 1) * 100;
 }
 
 /**
