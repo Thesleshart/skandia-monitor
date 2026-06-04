@@ -454,24 +454,28 @@ async function scrapeSkandiaData() {
           const sib = label.nextElementSibling;
           if (sib) {
             const n = parseNum(sib.textContent);
-            if (n && n > 1000) return n; // filtrar números pequeños (%, etc)
+            // Math.abs para soportar rendimientos negativos (ej: -$1.781)
+            if (n != null && Math.abs(n) > 10) return n;
           }
           // Estrategia 2: padre → hermano siguiente del padre
           const parentSib = label.parentElement?.nextElementSibling;
           if (parentSib) {
             const n = parseNum(parentSib.textContent);
-            if (n && n > 1000) return n;
+            if (n != null && Math.abs(n) > 10) return n;
           }
           // Estrategia 3: buscar en el contenedor completo del círculo
-          // (subiendo 2-3 niveles y buscando el número más grande)
+          // (subiendo 2-3 niveles; umbral bajo para soportar negativos pequeños)
           let ancestor = label.parentElement;
           for (let i = 0; i < 3; i++) {
             if (!ancestor) break;
             const nums = Array.from(ancestor.querySelectorAll('*'))
               .filter(el => el.children.length === 0)
               .map(el => parseNum(el.textContent))
-              .filter(n => n && n > 100_000); // Capital/Rendimientos son > $100.000
-            if (nums.length > 0) return Math.max(...nums);
+              .filter(n => n != null && Math.abs(n) > 100);
+            if (nums.length > 0) {
+              // Tomar el número de mayor valor absoluto (Capital o Rendimientos)
+              return nums.reduce((a, b) => Math.abs(a) > Math.abs(b) ? a : b);
+            }
             ancestor = ancestor.parentElement;
           }
         }
