@@ -4,9 +4,11 @@
  */
 function calcVariacion(actual, anterior) {
   if (anterior == null || anterior === 0 || actual == null) return null;
-  // ((actual / anterior) - 1) × 100
-  // Muestra cómo se comportan los rendimientos respecto al período anterior
-  return ((actual / anterior) - 1) * 100;
+  const result = ((actual / anterior) - 1) * 100;
+  // Cuando ambos son negativos, dos negativos dan positivo (signo incorrecto).
+  // Invertimos para que "más negativo que ayer" muestre variación negativa.
+  if (anterior < 0 && actual < 0) return -result;
+  return result;
 }
 
 /**
