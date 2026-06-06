@@ -263,8 +263,9 @@ function renderChart(records) {
 
   const toTs   = r => new Date(r.fecha+'T12:00:00').getTime();
   const series = [
-    { name: 'Saldo Total',       data: records.map(r => ({ x: toTs(r), y: r.total   })) },
-    { name: 'Capital Invertido', data: records.map(r => ({ x: toTs(r), y: r.capital })) },
+    { name: 'Saldo Total',       data: records.map(r => ({ x: toTs(r), y: r.total        })) },
+    { name: 'Capital Invertido', data: records.map(r => ({ x: toTs(r), y: r.capital      })) },
+    { name: 'Rendimientos',      data: records.map(r => ({ x: toTs(r), y: r.rendimientos })) },
   ];
 
   const opts = {
@@ -286,18 +287,18 @@ function renderChart(records) {
       },
     },
     theme: { mode: 'dark' },
-    colors: ['#22c55e', '#3b82f6'],
+    colors: ['#22c55e', '#3b82f6', '#f59e0b'],
     fill: {
-      type: 'gradient',
+      type: ['gradient', 'gradient', 'gradient'],
       gradient: {
         type: 'vertical',
         shadeIntensity: 1,
-        opacityFrom: 0.3,
-        opacityTo: 0.02,
+        opacityFrom: [0.3,  0.08, 0.2],
+        opacityTo:   [0.02, 0.02, 0.02],
         stops: [0, 100],
       },
     },
-    stroke: { curve: 'smooth', width: [2, 1.5], dashArray: [0, 5] },
+    stroke: { curve: 'smooth', width: [2, 1.5, 1.5], dashArray: [0, 5, 4] },
     dataLabels: { enabled: false },
     markers: { size: 0, hover: { size: 5 } },
     xaxis: {
