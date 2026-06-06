@@ -276,15 +276,9 @@ function renderChart(records) {
       zoom: { enabled: false },
       animations: { enabled: true, speed: 400 },
       events: {
-        mouseMove(_e, _ctx, cfg) {
-          const i = cfg.dataPointIndex;
-          if (i < 0 || i >= records.length) return;
-          const r  = records[i];
-          const [yy,mm,dd] = r.fecha.split('-');
-          document.getElementById('chart-val').textContent = fmt(r.total);
-          document.getElementById('chart-lbl').textContent =
-            dd+' '+MES[+mm-1]+' '+yy+'  ·  Capital: '+fmt(r.capital)+'  ·  Rendimientos: '+fmt(r.rendimientos);
-        },
+        // dataPointIndex solo se activa encima de un punto exacto.
+        // Usamos el tooltip custom (ver abajo) para actualizar el header
+        // en cualquier posición horizontal del cursor.
         mouseLeave() {
           document.getElementById('chart-val').textContent = fmt(latestTotal);
           document.getElementById('chart-lbl').textContent = 'Pasa el cursor sobre la gráfica para ver el detalle';
@@ -320,7 +314,33 @@ function renderChart(records) {
       },
       tickAmount: 4,
     },
-    tooltip: { enabled: false },
+    tooltip: {
+      shared: true,       // muestra ambas series al hover
+      intersect: false,   // activa en toda la línea, no solo sobre puntos exactos
+      theme: 'dark',
+      x: {
+        formatter: val => {
+          const d = new Date(val);
+          return d.getDate()+' '+MES[d.getMonth()]+' '+d.getFullYear();
+        },
+      },
+      y: {
+        formatter: (val, opts) => {
+          // Actualiza el header con los datos del punto bajo el cursor
+          if (opts && opts.seriesIndex === 0) {
+            document.getElementById('chart-val').textContent = fmt(val);
+            const idx = opts.dataPointIndex;
+            if (idx >= 0 && records[idx]) {
+              const r = records[idx];
+              const [yy,mm,dd] = r.fecha.split('-');
+              document.getElementById('chart-lbl').textContent =
+                dd+' '+MES[+mm-1]+' '+yy+'  ·  Capital: '+fmt(r.capital)+'  ·  Rend: '+fmt(r.rendimientos);
+            }
+          }
+          return fmt(val);
+        },
+      },
+    },
     grid: { borderColor:'#1e293b', strokeDashArray:3, padding:{ left:4, right:8 } },
     legend: {
       labels: { colors:'#94a3b8' },
