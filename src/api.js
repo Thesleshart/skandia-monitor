@@ -298,7 +298,7 @@ function renderChart(records) {
         stops: [0, 100],
       },
     },
-    stroke: { curve: 'smooth', width: [2, 1.5, 1.5], dashArray: [0, 5, 4] },
+    stroke: { curve: 'straight', width: [2, 1.5, 1.5], dashArray: [0, 5, 4] },
     dataLabels: { enabled: false },
     markers: { size: 0, hover: { size: 5 } },
     xaxis: {
