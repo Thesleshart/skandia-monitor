@@ -318,6 +318,7 @@ function renderChart(records) {
     tooltip: {
       shared: true,       // muestra ambas series al hover
       intersect: false,   // activa en toda la línea, no solo sobre puntos exactos
+      followCursor: true, // alinea la fecha del tooltip con la línea indicadora
       theme: 'dark',
       x: {
         formatter: val => {
