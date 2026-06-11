@@ -390,7 +390,7 @@ async function load() {
     // Tabla histórico (últimos 30)
     const all = hist.records||[];
     document.getElementById('histbody').innerHTML = all.slice(0,30).length
-      ? all.slice(0,30).map(r=>{ const rv=r.variaciones||{}; return \`<tr><td>\${r.fecha}</td><td>\${fmt(r.capital)}</td><td class="\${r.rendimientos>=0?'pos':'neg'}">\${fmt(r.rendimientos)}</td><td>\${fmt(r.total)}</td><td>\${badge(rv.diaria)||pct(rv.diaria)}</td><td>\${badge(rv.mensual)||pct(rv.mensual)}</td></tr>\`; }).join('')
+      ? all.slice(0,30).map(r=>{ const rv=r.variaciones||{}; const cf=r.fuente==='carry_forward'?' <span title="Skandia no actualizó este día — valor repetido del día anterior" style="color:#64748b;cursor:help">↻</span>':''; return \`<tr><td>\${r.fecha}\${cf}</td><td>\${fmt(r.capital)}</td><td class="\${r.rendimientos>=0?'pos':'neg'}">\${fmt(r.rendimientos)}</td><td>\${fmt(r.total)}</td><td>\${badge(rv.diaria)||pct(rv.diaria)}</td><td>\${badge(rv.mensual)||pct(rv.mensual)}</td></tr>\`; }).join('')
       : '<tr><td colspan="6" style="color:#64748b;text-align:center">Sin historial aún</td></tr>';
 
     // Gráfica (todos los registros)

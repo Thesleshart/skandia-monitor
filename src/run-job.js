@@ -10,6 +10,7 @@ const { scrapeSkandiaData } = require('./scraper');
 const {
   initSchema, saveRecord,
   getFirstRecordOfYear, getFirstRecordOfMonth, getPreviousRecord,
+  getRecordByDate, getLatestRecord,
 } = require('./database');
 const { syncToGoogleSheets } = require('./googleSheets');
 const { getVariaciones }     = require('./utils/calculations');
@@ -36,7 +37,25 @@ async function main() {
 
     // 2 ── Persistencia
     console.log('[JOB] 2/4  Guardando en Turso...');
-    await saveRecord(data, userId);
+    await saveRecord(data, userId, 'skandia');
+
+    // 2b ── Relleno de huecos: si Skandia repitió la fecha de ayer (no actualizó),
+    // y el registro de "ayer" aún no existe, lo creamos repitiendo el último dato disponible.
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    const ayerStr = ayer.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+
+    if (data.fecha < ayerStr) {
+      const existeAyer = await getRecordByDate(ayerStr, userId);
+      if (!existeAyer) {
+        console.log(`[JOB] Skandia no actualizó (fecha=${data.fecha}, ayer=${ayerStr}). Repitiendo último dato disponible...`);
+        const ultimo = await getLatestRecord(userId);
+        if (ultimo) {
+          await saveRecord({ ...ultimo, fecha: ayerStr }, userId, 'carry_forward');
+          console.log(`[JOB] Registro ${ayerStr} creado con fuente=carry_forward (repite ${ultimo.fecha})`);
+        }
+      }
+    }
 
     // 3 ── Variaciones + Google Sheets
     console.log('[JOB] 3/4  Variaciones + Google Sheets...');

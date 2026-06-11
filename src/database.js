@@ -72,6 +72,21 @@ async function initSchema() {
     // Tabla no existe aún — se crea abajo
   }
 
+  // ── Migración: agregar columna fuente si no existe ──
+  try {
+    const { rows: cols } = await client.execute('PRAGMA table_info(daily_records)');
+    if (cols.length > 0) {
+      const hasFuente = cols.some(r => r.name === 'fuente');
+      if (!hasFuente) {
+        console.log('[DB] Migrando schema: agregando fuente...');
+        await client.execute(`ALTER TABLE daily_records ADD COLUMN fuente TEXT NOT NULL DEFAULT 'skandia'`);
+        console.log('[DB] Migración completada: fuente agregado');
+      }
+    }
+  } catch (e) {
+    // Tabla no existe aún — se crea abajo
+  }
+
   // ── Crear tablas (fresh install o post-migración) ──────────────────
   await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS daily_records (
@@ -82,6 +97,7 @@ async function initSchema() {
       rendimientos       REAL,
       total              REAL,
       cuenta_contingente REAL,
+      fuente             TEXT    NOT NULL DEFAULT 'skandia',
       created_at         TEXT DEFAULT (datetime('now')),
       UNIQUE(user_id, fecha)
     );
@@ -106,15 +122,16 @@ async function initSchema() {
 // WRITE
 // ──────────────────────────────────────────────
 
-async function saveRecord(data, userId = 'sebastian') {
+async function saveRecord(data, userId = 'sebastian', fuente = 'skandia') {
   await client.execute({
-    sql: `INSERT INTO daily_records (user_id, fecha, capital, rendimientos, total, cuenta_contingente)
-          VALUES (:user_id, :fecha, :capital, :rendimientos, :total, :cuenta_contingente)
+    sql: `INSERT INTO daily_records (user_id, fecha, capital, rendimientos, total, cuenta_contingente, fuente)
+          VALUES (:user_id, :fecha, :capital, :rendimientos, :total, :cuenta_contingente, :fuente)
           ON CONFLICT(user_id, fecha) DO UPDATE SET
             capital            = excluded.capital,
             rendimientos       = excluded.rendimientos,
             total              = excluded.total,
-            cuenta_contingente = excluded.cuenta_contingente`,
+            cuenta_contingente = excluded.cuenta_contingente,
+            fuente             = excluded.fuente`,
     args: {
       user_id:            userId,
       fecha:              data.fecha,
@@ -122,6 +139,7 @@ async function saveRecord(data, userId = 'sebastian') {
       rendimientos:       data.rendimientos       ?? null,
       total:              data.total              ?? null,
       cuenta_contingente: data.cuenta_contingente ?? null,
+      fuente:             fuente,
     },
   });
 
